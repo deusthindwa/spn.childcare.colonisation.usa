@@ -518,9 +518,18 @@ X <-
       dplyr::mutate(seas = 'Winter/Spring 2021/22') %>%
       dplyr::left_join(t2 %>% dplyr::select(st, adjusted_prevalence) %>% dplyr::mutate(st = stringr::str_sub(toupper(st), 3, nchar(st))))) %>%
   
-  dplyr::mutate(st = tolower(st), seas = factor(seas, levels = c('Spring 2021','Winter/Spring 2021/22','Overall'))) %>%
+  dplyr::mutate(seas = factor(seas, levels = c('Spring 2021','Winter/Spring 2021/22','Overall'))) %>%
   dplyr::filter(st != '6abcd', st != '34') %>%
   tidyr::complete(st, seas, fill = list(adjusted_prevalence = 0)) %>%
+  dplyr::mutate(st = if_else(st=='6ABCD', '6A/B/C/D',
+                             if_else(st=='7FA', '7F/A',
+                                     if_else(st=='9LN', '9L/N',
+                                             if_else(st=='9VA', '9V/A',
+                                                     if_else(st=='11ADE', '11A/D/E',
+                                                             if_else(st=='15BC', '15B/C',
+                                                                     if_else(st=='22FA', '22F/A',
+                                                                             if_else(st=='28FA', '28F/A',
+                                                                                     if_else(st=='33FA_37', '33F/A/37', st)))))))))) %>%
   
   ggplot() + 
   geom_point(aes(x = adjusted_prevalence, y = reorder(st, adjusted_prevalence, decreasing = F), color = seas), stat = 'identity', shape = 4, size = 2.5, stroke = 2.5, position = position_dodge(width = 0.3)) + 
@@ -540,11 +549,20 @@ Y <-
     data_frame(modelDF) %>% dplyr::mutate(seas = 'Overall')) %>%
   dplyr::filter(!is.na(acqL)) %>%
   dplyr::ungroup() %>%
-  
   dplyr::filter(st !='st9ln') %>%
   dplyr::mutate(st = stringr::str_sub(st, 3, nchar(st)),
                 st = factor(st, levels = c('33fa_37','19a','15bc','23b','20','11ade','19f','10a','23f','23a','21','3','17','22fa','16f','9va','28fa','7fa')),
                 seas = factor(seas, levels = c('Overall','Spring 2021','Winter/Spring 2021/22'))) %>%
+  dplyr::mutate(st = toupper(st)) %>%
+  dplyr::mutate(st = factor(if_else(st=='6ABCD', '6A/B/C/D',
+                             if_else(st=='7FA', '7F/A',
+                                     if_else(st=='9LN', '9L/N',
+                                             if_else(st=='9VA', '9V/A',
+                                                     if_else(st=='11ADE', '11A/D/E',
+                                                             if_else(st=='15BC', '15B/C',
+                                                                     if_else(st=='22FA', '22F/A',
+                                                                             if_else(st=='28FA', '28F/A',
+                                                                                     if_else(st=='33FA_37', '33F/A/37', st))))))))), levels = c('33F/A/37','19A','15B/C','23B','20','11A/D/E','19F','10A','23F','23A','21','3','17','22F/A','16F','9V/A','28F/A','7F/A'))) %>%
   ggplot() +
   geom_point(aes(x=st, y=log(acq), size = cle, color = seas),  shape=1, stroke = 2.5, position = position_jitter(width = 0,seed=1988), stat = "identity") +
   geom_errorbar(aes(x=st, y=log(acq),  ymin = log(acqL), ymax = log(acqU), color = seas), width = 0, size = 1.2, position = position_jitter(width = 0, seed=1988), stat = "identity") +
@@ -557,7 +575,7 @@ Y <-
   #coord_cartesian(ylim = c(-11, -2.5)) +
   theme_bw(base_size = 14, base_family = 'American Typewriter') + 
   labs(title = "(B)", x = "Pneumococcal serotype", y = "Daily carriage acquisition log_rate") + 
-  theme(axis.text.y = element_text(size = 16), axis.text.x = element_text(size = 16)) + 
+  theme(axis.text.y = element_text(size = 16), axis.text.x = element_text(size = 16, angle = 90, vjust = 0.5, hjust = 1)) + 
   facet_grid(seas ~.) +
   theme(legend.text = element_text(size = 12)) +
   guides(color = guide_legend(title="Study period"), size = guide_legend(title="Carriage\nduration")) +

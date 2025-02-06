@@ -125,7 +125,7 @@ tc_dataSX <- lapply(1:max(tc_dataS$person_index), function(X) {
   }) %>% 
   dplyr::bind_rows() %>%
   dplyr::select(everything(), -cdate, -lyta_bi, -visit_index, -lag_dom_st, -lag_dom_st_adjusted, -person_index) %>%
-  dplyr::mutate(sswitch = factor(if_else((lag(state)==2 & state==3) | (lag(state)==3 & state==2), 1L, 0L))) #phi parameter in the model diagram as covariate
+  dplyr::mutate(sswitch = factor(if_else((lag(state)==2 & state==3) | (lag(state)==3 & state==2), 'on', 'off'))) #phi parameter in the model diagram as covariate
 
 #===============================================================================
 #markov models for whole carriage and risk factors (main)
