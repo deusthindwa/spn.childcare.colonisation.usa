@@ -166,7 +166,7 @@ Period1 <- hazard.msm(spn_modelfit1, hazard.scale = 1, cl = 0.95)
 spn_modelfit2 <- msm(state ~ dys, subject = pid, data = tc_fup %>% dplyr::filter(seas=="Period2"),
                      qmatrix = spn_Qmatrix,
                      qconstraint = c(1,1,2,1,2,1),
-                     covariates = list("1-2" = ~ agey + sex + ethn + hhsize + sswitch, 
+                     covariates = list("1-2" = ~ agey + sex + ethn + seasx + hhsize + sswitch, 
                                        "2-1" = ~ agey + sex ),
                      opt.method = "bobyqa", control = list(maxfun = 10000000))
 Period2 <- hazard.msm(spn_modelfit2, hazard.scale = 1, cl = 0.95)

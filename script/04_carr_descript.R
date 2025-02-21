@@ -126,6 +126,7 @@ C <-
   geom_errorbar(aes(x = spnden, y = p, ymin = p_lci, ymax = p_uci, color = seas, group = gp), width = 0, size = 1, position = position_dodge(width = 0.6)) +
   theme_bw(base_size = 14, base_family = "American Typewriter") +
   scale_shape_manual(values = c(4,1)) +
+  scale_color_manual(values = c('#F8766D', '#00BA38')) +
   scale_y_continuous(breaks=c(0.10, 0.20, 0.30, 0.40, 0.50), limits = c(0.05, 0.45), labels = scales::percent_format(accuracy = 1)) + 
   labs(title = "(C)", x = "Carriage density", y = "Unadjusted prevalence") + 
   theme(axis.text.x = element_text(size = 12), axis.text.y = element_text(size = 12)) +
@@ -159,6 +160,7 @@ D <-
   geom_errorbar(aes(x = yrmo, y = p, ymin = p_lci, ymax = p_uci, color = seas, group=meth), width = 0, size = 1, position = position_dodge(width = 0.2)) +
   theme_bw(base_size = 14, base_family = "American Typewriter") +
   scale_shape_manual(values = c(4,1)) +
+  scale_color_manual(values = c('#F8766D', '#00BA38')) +
   scale_y_continuous(limit = c(0, 0.95), breaks = seq(0, 0.95, 0.10), labels = scales::percent_format(accuracy = 1)) +
   labs(title = "(D)", x = "Sampling month", y = "Unadjusted prevalence") +
   theme(plot.title = element_text(size = 20), axis.text.x = element_text(size = 12, angle = 90, vjust = 0.5), axis.text.y = element_text(size = 12)) +
