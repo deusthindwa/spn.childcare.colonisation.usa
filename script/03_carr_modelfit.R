@@ -7,7 +7,7 @@
 
 #load carriage data
 tc_data <- 
-  rio::import(here::here("data","kidsData.rds")) %>%
+  rio::import(here::here("data","kidsData.xlsx")) %>%
   dplyr::select(sample_id, collection_date, pid, daycare_location, household_size, race.y, sex.y, age_years, piab_bi, lyta_bi, piab2, ethnicity, season.x) %>%
   
   #data munging
