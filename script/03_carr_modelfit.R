@@ -5,6 +5,39 @@
 #data manipulation for analysis
 #===============================================================================
 
+# age distribution in different household sizes
+rio::import(here::here("data","kidsData.xlsx")) %>%
+  dplyr::select(sample_id, collection_date, pid, daycare_location, household_size, race.y, sex.y, age_years, piab_bi, lyta_bi, piab2, ethnicity, season.x) %>%
+  
+  #data munging
+  dplyr::rename("daycare"="daycare_location", "cdate"="collection_date", "hhsize"="household_size", "ctvalue"="piab2", "race"="race.y", "sex"="sex.y", "agey"="age_years", "ethn"="ethnicity", "seas"="season.x") %>%
+  dplyr::mutate(cdate = date(cdate),
+                seas = if_else(seas == "season1",1L,2L),
+                pid = stringr::str_c(pid,seas)) %>%
+  dplyr::arrange(pid, cdate) %>%
+  group_by(pid) %>%
+  dplyr::mutate(dys = cumsum(as.integer(cdate - lag(cdate, default = first(cdate))))) %>%
+  ungroup() %>%
+  
+  dplyr::group_by(daycare) %>%
+  dplyr::mutate(dycare = n_distinct(pid)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(seasx = if_else(year(cdate) == 2022 & date(cdate)>='2022-03-20', 1, seas)) %>% #sensitivity analysis
+  distinct(pid, .keep_all = TRUE) %>% 
+  dplyr::mutate(seas = if_else(seas == 1, "Spring 2021", "Winter/Spring 2021/22"),
+                hhsize = str_c('HHsize', ' ', hhsize)) %>%
+  
+  ggplot() + geom_histogram(aes(x = agey)) + 
+  facet_grid(seas~hhsize) +
+  labs(title = "", x = "Age in years", y = "Count") + 
+  theme_bw(base_size = 14, base_family = 'Lato') +
+  guides(color = guide_legend(title = "")) +
+  theme(axis.text.y = element_text(size = 12), axis.text.x = element_text(size = 12)) + 
+  theme(strip.text.x = element_text(size = 16), strip.background = element_rect(fill="gray90")) +
+  theme(legend.text = element_text(size = 12), legend.position = 'none') +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+
 #load carriage data
 tc_data <- 
   rio::import(here::here("data","kidsData.xlsx")) %>%

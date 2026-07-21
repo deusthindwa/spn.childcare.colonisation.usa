@@ -21,7 +21,7 @@ viral_data <-
                 rhino = as.integer(rhino), 
                 rsv = as.integer(rsv))
 
-cols <- c('Spring 2021'='#F8766D','Winter/Spring 2021/22'='#00BA38')
+cols <- c('Spring 2021'='#E69F00','Winter/Spring 2021/22'='#56B4E9')
 
 A <-
   bind_rows(
@@ -36,8 +36,8 @@ A <-
   
   ggplot() +
   geom_line(aes(x = yrmo, y=n, group=1), size = 1.2) +
-  geom_rect(aes(xmin = ('2021-01'), xmax = ('2021-06'), ymin = 0, ymax = Inf, color = 'Spring 2021', alpha= 0.004), alpha = 0.004, fill='#F8766D') +
-  geom_rect(aes(xmin = ('2021-11'), xmax = ('2022-06'), ymin = 0, ymax = Inf, color = 'Winter/Spring 2021/22'), alpha = 0.004, fill='#00BA38') +
+  geom_rect(aes(xmin = ('2021-01'), xmax = ('2021-06'), ymin = 0, ymax = Inf, color = 'Spring 2021'), alpha = 0.01, fill='#E69F00') +
+  geom_rect(aes(xmin = ('2021-11'), xmax = ('2022-06'), ymin = 0, ymax = Inf, color = 'Winter/Spring 2021/22'), alpha = 0.01, fill='#56B4E9') +
   scale_colour_manual(name = "Study period:", values = cols) + 
   facet_wrap(.~pathogen, nrow = 4, scales = 'free_y') +
   theme_bw(base_size = 16,  base_family = 'American Typewriter') + 

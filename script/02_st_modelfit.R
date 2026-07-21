@@ -11,7 +11,7 @@ t0 <-
   dplyr::mutate(date = as.Date(collection_date, '%d/%m/%Y')) %>%
   dplyr::select(-starts_with('binary')) %>%
   dplyr::select(sampleid, date, starts_with('st'), pneumo_pos,piab_final) %>%
-  melt(., id.vars=c('sampleid', 'date','pneumo_pos','piab_final'))  %>%
+  reshape2::melt(., id.vars=c('sampleid', 'date','pneumo_pos','piab_final'))  %>%
   dplyr::rename(st=variable) %>%
   dplyr::mutate(st_pos=if_else(value<45,1,0)) %>%
   dplyr::filter(!is.na(pneumo_pos)) %>%
@@ -26,7 +26,7 @@ t1 <-
   dplyr::group_by(st, pneumo_pos) %>%
   dplyr::summarize(N_samps = n(), N_pos = sum(st_pos), pct = mean(st_pos)) %>%
   dplyr::ungroup() %>%
-  dcast( ., st ~ pneumo_pos, value.var = 'pct')
+  maditr::dcast( ., st ~ pneumo_pos, value.var = 'pct')
 
 #download file and store in data folder
 download.file('https://github.com/DanWeinberger/ABCs_pneumococcal_data/raw/refs/heads/master/Data/ABCs_st_1998_2021.rds', here::here("data", "abc_temp.RDS"))
@@ -77,8 +77,8 @@ inv1 <-
   read.csv('https://raw.githubusercontent.com/weinbergerlab/Invasiveness_Navajo/main/Results/mcmc_invasive_single_stage.csv') %>%
   dplyr::select('st','log.inv.age1') %>%
   dplyr::mutate(st = if_else(st %in% c('15B','15C', '15B/C'), '15BC', st))
-
-#export invasiveness dataset to datra folder
+  
+#export invasiveness dataset to data folder
 rio::export(inv1, here::here("data", "invasiveness.csv"))
 
 #reconcile inferred prevalence from ABCs IPD data with trackcare data and compute probability of false positive
@@ -112,6 +112,76 @@ b1 <-
   dplyr::select(st, pre_test_prob, false_pos) %>%
   dplyr::mutate(sensitivity = 1,
                 probability_pos = (sensitivity*pre_test_prob)/(sensitivity*pre_test_prob + (1-pre_test_prob)*false_pos)) 
+
+#===============================================================================
+
+inv2 <- 
+  rio::import(here("data", "invasiveness_lonchen.xlsx")) %>%
+  dplyr::mutate(log.inv2.age1 = log(invasiveness)) %>%
+  dplyr::rename('st' = 'Serotype') %>%
+  dplyr::select('st','log.inv2.age1') %>%
+  dplyr::mutate(st = if_else(st %in% c('15B','15C', '15B/C'), '15BC', st))
+
+dplyr::left_join(inv2, inv1) %>%
+  dplyr::filter(!is.na(log.inv.age1)) %>%
+  ggplot(aes(x = log.inv2.age1, y = log.inv.age1)) +
+  geom_point(aes(color = st), shape = 1, size = 2, stroke = 1) +
+  stat_cor(method = "pearson", label.x = -6, label.y = 8) + 
+  geom_text(aes(x = log.inv2.age1, y = log.inv.age1, label = st, color = st),  size = 4, vjust = 0, hjust = -0.4) + 
+  geom_smooth(method = "lm") +
+  theme_bw(base_size = 14, base_family = "Lato") +
+  theme(axis.text.x = element_text(size = 12), axis.text.y = element_text(size = 12)) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1)) +
+  labs(title = "", x = "Invasiveness reported by Lonchen et al (2022)", y = "Invasiveness reported from Navajo") +
+  theme(legend.position = "none")
+
+#compute probability of false positive
+bX <- 
+  base::merge(a1, inv2, by.x ='st', by.y ='st', all = T) %>%
+  dplyr::mutate(log.inv2.age1 = if_else(is.na(log.inv2.age1), mean(log.inv2.age1, na.rm = T), log.inv2.age1), #if missing, assign the mean invassiveness
+                N_IPD_kid = if_else(is.na(N_IPD_kid), 0.5, N_IPD_kid),
+                invasiveness = exp(log.inv2.age1),
+                carr_est = N_IPD_kid/invasiveness/10000, #estimate prevalence (C)
+                carr_prop = carr_est/sum(carr_est),  #pre
+                
+                #change serotypes to match those in the pcr panel
+                st = if_else(st %in% c('17F','17A'), '17', st),
+                st = if_else(st %in% c('7F','7A'), '7FA', st),
+                st = if_else(st %in% c('9V','9A'), '9VA', st),
+                st = if_else(st %in% c('11A','11D','11E'), '11ADE', st),
+                st = if_else(st %in% c('9L','9N'), '9LN', st),
+                st = if_else(st %in% c('22F','22A'), '22FA', st),
+                st = if_else(st %in% c('6A','6B','6C','6D'), '6ABCD', st),
+                #st = if_else(st %in% c('23F','23A','23B'), '23FAB', st),
+                #st = if_else(st %in% c('23F','23A','23B'), '23FAB', st),
+                st = if_else(st %in% c('28F','28A'), '28FA', st),
+                st = if_else(st %in% c('33F','33A','37'), '33FA_37', st)) %>%
+  
+  dplyr::group_by(st) %>%
+  dplyr::summarize(pre_test_prob = sum(carr_prop)) %>%
+  dplyr::full_join(t1, by = 'st') %>%
+  dplyr::ungroup() %>%
+  dplyr::rename(false_pos = '0') %>%
+  dplyr::mutate(false_pos = if_else(is.na(false_pos), 0, false_pos)) %>%
+  dplyr::select(st, pre_test_prob, false_pos) %>%
+  dplyr::mutate(sensitivity = 1,
+                probability_pos = (sensitivity*pre_test_prob)/(sensitivity*pre_test_prob + (1-pre_test_prob)*false_pos)) 
+
+
+dplyr::left_join(b1 %>% dplyr::select(st, probability_pos), 
+                 bX %>% dplyr::select(st, probability_pos) %>% dplyr::rename('probability_posX' = 'probability_pos')) %>%
+  ggplot(aes(x = probability_posX, y=probability_pos)) +
+  geom_point(aes(color = st), shape = 1, size = 2, stroke = 1) +
+  stat_cor(method = "pearson", label.x = 0.75, label.y = 0.25) + 
+  geom_text(aes(x = probability_posX, y = probability_pos, label = st, color = st),  size = 4, vjust = 0, hjust = -0.4) + 
+  geom_smooth(method = "lm", alpha=0.2, color = 'gray60') +
+  theme_bw(base_size = 14, base_family = "Lato") +
+  theme(axis.text.x = element_text(size = 12), axis.text.y = element_text(size = 12)) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1)) +
+  labs(title = "", x = "Probability of true positive for pneumococcus (Lonchen et al invasiveness)", y = "Probability of true positivity for pneumococcus (Navajo invasiveness)") +
+  theme(legend.position = "none")
+
+#===============================================================================
 
 #compute adjusted prevalence of the piab positive prevalence
 t2 <- 
@@ -157,6 +227,32 @@ trackcare <-
   dplyr::mutate(cdate = dmy(collection_date)) %>%
   dplyr::filter(!is.na(piab_final)) %>% #remove any mission final spn status
   dplyr::select(cdate, pid, season, piab_final, pneumo_pos, binary_st17:binary_st33fa_37)
+
+
+trackcare %>%
+  dplyr::select(cdate, pid, season, pneumo_pos) %>%
+  dplyr::mutate(cdate = as.Date(cdate),
+                pid = factor(pid),
+                pneumo_pos = factor(pneumo_pos, levels = c(0, 1), labels = c("Negative", "Positive")),
+                season = factor(season, levels = c("season1", "s2"), labels = c("Season 1", "Season 2"))) %>%
+
+ggplot(aes(x = cdate, y = pid, fill = pneumo_pos)) +
+  geom_tile(width = 10, height = 1, colour = "white", linewidth = 0.2) +
+  scale_fill_manual(values = c("Negative" = "gray80", "Positive" = "#89CFF0"), name   = "Pneumococcal status") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  #facet_grid(season ~ ., scales = "free", space = "free_y") +
+  labs(x = "Follow-up date", y = "Participant ID (pid)") +
+  theme_bw(base_size = 11) +
+  theme(
+    axis.text.x      = element_text(angle = 60, hjust = 1, size = 10),
+    axis.text.y      = element_text(size = 7),
+    strip.background = element_rect(fill = "gray92", colour = "gray60"),
+    strip.text       = element_text(face = "bold"),
+    legend.position  = "bottom",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
 
 #rename binary columns to their serotype
 for (col in 6:ncol(trackcare)){
@@ -296,8 +392,11 @@ trackcare_s1 <-
   dplyr::select(dys, pid, st17, st7fa, st15bc, st10a, st20, st9va, st23b, st11ade, st19a, st9ln, st16f, st21, st22fa , st3 , st23fab, st23a, st19f, st28fa, st33fa_37) %>%
   dplyr::rename("st23f" = "st23fab")
 
-var <- c('st17','st7fa','st15bc','st10a','st20','st9va','st23b','st11ade','st19a','st9ln','st16f','st21','st22fa','st3','st23f','st23a','st19f','st28fa','st33fa_37')
+var <- c('st17','st7fa','st15bc','st10a','st23b','st11ade','st19a','st22fa','st23f','st23a','st28fa','st33fa_37')
 trackcare_s1[,var] <- sapply(trackcare_s1[,var],function(x) ifelse(x == 1, 2L, 1L))
+
+#some elements of the list don't have enough data hence being removed
+#c('st20', 'st9va', 'st9ln', 'st16f', 'st21', 'st3', 'st19f')
 
 #Markov model including new carriage status, spn_n
 #show transition frequency
@@ -316,6 +415,7 @@ for (st_name in var) {
     mutate(st = if_else(st_name %in% c(t3 %>% rownames(.)[1]), st_name, NA_character_)) %>%
     dplyr::left_join(t3) %>%
     dplyr::select(everything(), -st)
+  
   
   colnames(trackcare_x[[st_name]]) <- c('dys', 'pid', 'nstate', 'prob_pos')
   
@@ -396,8 +496,11 @@ trackcare_s2 <-
   dplyr::select(dys, pid, st17, st7fa, st15bc, st10a, st20, st9va, st23b, st11ade, st19a, st9ln, st16f, st21, st22fa , st3 , st23fab, st23a, st19f, st28fa, st33fa_37) %>%
   dplyr::rename("st23f" = "st23fab")
 
-var <- c('st17','st7fa','st15bc','st10a','st20','st9va','st23b','st11ade','st19a','st9ln','st16f','st21','st22fa','st3','st23f','st23a','st19f','st28fa','st33fa_37')
+var <- c('st17','st7fa','st15bc','st10a','st20','st9va','st11ade','st19a','st9ln','st16f','st21','st22fa','st3','st23f','st19f','st28fa','st33fa_37')
 trackcare_s2[,var] <- sapply(trackcare_s2[,var],function(x) ifelse(x == 1, 2L, 1L))
+
+#some elements of the list don't have enough data hence being removed
+#c('st23b', 'st23a')
 
 #Markov model including new carriage status, spn_n
 #show transition frequency
@@ -486,6 +589,7 @@ modelDF_per2 <-
 
 #===============================================================================
 #===============================================================================
+seas = c('Overall'='#009E73', 'Spring 2021'='#E69F00', 'Winter/Spring 2021/22'='#56B4E9')
 
 X <-
   bind_rows(
@@ -534,14 +638,16 @@ X <-
   ggplot() + 
   geom_point(aes(x = adjusted_prevalence, y = reorder(st, adjusted_prevalence, decreasing = F), color = seas), stat = 'identity', shape = 4, size = 2.5, stroke = 2.5, position = position_dodge(width = 0.3)) + 
   theme_bw(base_size = 14, base_family = "American Typewriter") +
+  scale_color_manual(values = seas) +
   labs(title = "(A)", x = "Adjusted prevalence", y = "Pneumococcal serotype") +
   scale_x_continuous(limit = c(0, 0.12), breaks = seq(0, 0.12, 0.02), labels = scales::percent_format(accuracy = 1)) + 
   guides(color = guide_legend(title = "")) +
   theme(legend.position = 'none', axis.text=element_text(size=16), legend.text = element_text(size=10)) +
   theme(panel.border = element_rect(colour = "black", fill = NA, size = 2))
 
+
 #combined plot for serotype acquisition of the seasons above
-seascol = c('Overall'='#619CFF', 'Spring 2021'='#F8766D', 'Winter/Spring 2021/22'='#00BA38')
+seascol = c('Overall'='#009E73', 'Spring 2021'='#E69F00', 'Winter/Spring 2021/22'='#56B4E9')
 Y <-
   bind_rows(
     data_frame(modelDF_per1) %>% dplyr::mutate(seas = 'Spring 2021') %>% dplyr::filter(st !='st19a'), 
